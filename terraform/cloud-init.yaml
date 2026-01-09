@@ -1,0 +1,42 @@
+#cloud-config
+users:
+  - name: user
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh-authorized-keys:
+      - ${ssh_key}
+
+write_files:
+  - path: /etc/docker/daemon.json
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "100m"
+        }
+      }
+  
+  - path: /usr/local/bin/start-app.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      set -x
+      
+      echo "=== Waiting for Network and Metadata... ==="
+      sleep 15
+      
+      echo "=== Configuring Docker Credential Helper ==="
+      docker-credential-ycr configure-docker
+      
+      echo "=== Starting Container... ==="
+      docker run -d --restart always -p 5000:5000 \
+        -e YDB_ENDPOINT="${ydb_endpoint}" \
+        -e YDB_DATABASE="${ydb_db}" \
+        -e BUCKET_NAME="${bucket}" \
+        -e AWS_ACCESS_KEY_ID="${key_id}" \
+        -e AWS_SECRET_ACCESS_KEY="${key_secret}" \
+        ${docker_image_url}
+
+runcmd:
+  - /usr/local/bin/start-app.sh
